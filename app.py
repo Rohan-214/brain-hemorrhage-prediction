@@ -2,62 +2,105 @@ import streamlit as st
 import joblib
 import numpy as np
 
-# Page config
-st.set_page_config(page_title="Brain Hemorrhage Prediction", layout="centered")
-
-# Load model
-model = joblib.load("hemorrhage_model.pkl")
+# Page Config
+st.set_page_config(
+    page_title="Brain Hemorrhage Prediction",
+    page_icon="🧠",
+    layout="centered"
+)
 
 # Title
 st.title("🧠 Early Brain Hemorrhage Risk Prediction System")
 
-st.markdown("### Enter Patient Clinical Details")
+st.markdown(
+    """
+    <div style='background-color:#f8f9fa;padding:15px;border-radius:10px'>
+    ⚠️ <b>Disclaimer:</b> This tool is for educational purposes only and should NOT replace medical diagnosis.
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
-# Layout in two columns
+# Load model safely
+@st.cache_resource
+def load_model():
+    return joblib.load("hemorrhage_model.pkl")
+
+model = load_model()
+
+st.markdown("### 📝 Enter Patient Clinical Details")
+
+# Columns layout
 col1, col2 = st.columns(2)
 
 with col1:
-    age = st.number_input("Age", min_value=20, max_value=100, value=40)
-    systolic_bp = st.number_input("Systolic Blood Pressure (mmHg)", min_value=80, max_value=250, value=120)
-    gcs_total = st.number_input("GCS Total Score", min_value=3, max_value=15, value=15)
+    age = st.number_input("Age", 20, 100, 40)
+    systolic_bp = st.number_input("Systolic BP (mmHg)", 80, 250, 120)
+    gcs_total = st.number_input("GCS Score", 3, 15, 15)
 
 with col2:
-    seizure = st.selectbox("Seizure Present?", ["No", "Yes"])
-    vomiting = st.selectbox("Vomiting Present?", ["No", "Yes"])
-    afib = st.selectbox("Atrial Fibrillation?", ["No", "Yes"])
+    seizure = st.selectbox("Seizure", ["No", "Yes"])
+    vomiting = st.selectbox("Vomiting", ["No", "Yes"])
+    afib = st.selectbox("Atrial Fibrillation", ["No", "Yes"])
 
-# Convert Yes/No to 0/1
+# Convert categorical to numeric
 seizure = 1 if seizure == "Yes" else 0
 vomiting = 1 if vomiting == "Yes" else 0
 afib = 1 if afib == "Yes" else 0
 
 st.markdown("---")
 
+# Prediction Button
 if st.button("🔍 Predict Risk"):
 
-    input_data = np.array([[age, systolic_bp, gcs_total, seizure, vomiting, afib]])
-    prediction = model.predict(input_data)[0]
-    probability = model.predict_proba(input_data)[0][1]
-
-    risk_percent = probability * 100
-
-    st.markdown("## Prediction Result")
-
-    # Risk Meter
-    st.progress(int(risk_percent))
-
-    if prediction == 1:
-        st.error(f"🔴 High Hemorrhage Risk Detected")
-        st.markdown(f"### Probability: **{risk_percent:.2f}%**")
+    # Validation check
+    if gcs_total < 3 or gcs_total > 15:
+        st.error("Invalid GCS Score")
     else:
-        st.success(f"🟢 Low Hemorrhage Risk")
-        st.markdown(f"### Probability: **{risk_percent:.2f}%**")
+        input_data = np.array([[age, systolic_bp, gcs_total, seizure, vomiting, afib]])
 
-    # Risk Interpretation
-    if risk_percent < 30:
-        st.info("Risk Level: Mild")
-    elif risk_percent < 70:
-        st.warning("Risk Level: Moderate")
-    else:
-        st.error("Risk Level: Severe")
+        prediction = model.predict(input_data)[0]
+        probability = model.predict_proba(input_data)[0][1]
+        risk_percent = probability * 100
 
+        st.markdown("## 📊 Prediction Result")
+
+        # Progress bar
+        st.progress(int(risk_percent))
+
+        # Risk Color Logic
+        if risk_percent < 30:
+            color = "green"
+            level = "Mild"
+        elif risk_percent < 70:
+            color = "orange"
+            level = "Moderate"
+        else:
+            color = "red"
+            level = "Severe"
+
+        # Result Display
+        st.markdown(
+            f"""
+            <div style='padding:20px;border-radius:10px;background-color:#f1f3f5'>
+                <h3 style='color:{color}'>Risk Level: {level}</h3>
+                <h4>Probability: {risk_percent:.2f}%</h4>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        if prediction == 1:
+            st.error("🔴 High Hemorrhage Risk Detected")
+        else:
+            st.success("🟢 Low Hemorrhage Risk")
+
+        # Recommendations
+        st.markdown("### 🩺 Recommendations")
+
+        if level == "Mild":
+            st.info("Maintain healthy lifestyle and monitor regularly.")
+        elif level == "Moderate":
+            st.warning("Consult a doctor and monitor symptoms closely.")
+        else:
+            st.error("Seek immediate medical attention!")
