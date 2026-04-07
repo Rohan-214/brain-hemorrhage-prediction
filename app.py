@@ -4,103 +4,120 @@ import numpy as np
 
 # Page Config
 st.set_page_config(
-    page_title="Brain Hemorrhage Prediction",
+    page_title="Hemorrhage Dashboard",
     page_icon="🧠",
-    layout="centered"
+    layout="wide"
 )
 
-# Title
-st.title("🧠 Early Brain Hemorrhage Risk Prediction System")
-
-st.markdown(
-    """
-    <div style='background-color:#f8f9fa;padding:15px;border-radius:10px'>
-    ⚠️ <b>Disclaimer:</b> This tool is for educational purposes only and should NOT replace medical diagnosis.
-    </div>
-    """,
-    unsafe_allow_html=True
-)
-
-# Load model safely
+# Load model
 @st.cache_resource
 def load_model():
     return joblib.load("hemorrhage_model.pkl")
 
 model = load_model()
 
-st.markdown("### 📝 Enter Patient Clinical Details")
+# ---------------- SIDEBAR ----------------
+st.sidebar.title("🧾 Patient Info")
 
-# Columns layout
-col1, col2 = st.columns(2)
+age = st.sidebar.number_input("Age", 20, 100, 40)
+systolic_bp = st.sidebar.number_input("Systolic BP", 80, 250, 120)
+gcs_total = st.sidebar.number_input("GCS Score", 3, 15, 15)
 
-with col1:
-    age = st.number_input("Age", 20, 100, 40)
-    systolic_bp = st.number_input("Systolic BP (mmHg)", 80, 250, 120)
-    gcs_total = st.number_input("GCS Score", 3, 15, 15)
+seizure = st.sidebar.selectbox("Seizure", ["No", "Yes"])
+vomiting = st.sidebar.selectbox("Vomiting", ["No", "Yes"])
+afib = st.sidebar.selectbox("Atrial Fibrillation", ["No", "Yes"])
 
-with col2:
-    seizure = st.selectbox("Seizure", ["No", "Yes"])
-    vomiting = st.selectbox("Vomiting", ["No", "Yes"])
-    afib = st.selectbox("Atrial Fibrillation", ["No", "Yes"])
-
-# Convert categorical to numeric
+# Convert values
 seizure = 1 if seizure == "Yes" else 0
 vomiting = 1 if vomiting == "Yes" else 0
 afib = 1 if afib == "Yes" else 0
 
+# ---------------- HEADER ----------------
+st.markdown(
+    """
+    <h1 style='text-align:center;'>🏥 Brain Hemorrhage Risk Dashboard</h1>
+    <hr>
+    """,
+    unsafe_allow_html=True
+)
+
+# ---------------- KPI CARDS ----------------
+col1, col2, col3 = st.columns(3)
+
+col1.metric("🧓 Age", age)
+col2.metric("💓 BP", f"{systolic_bp} mmHg")
+col3.metric("🧠 GCS", gcs_total)
+
 st.markdown("---")
 
-# Prediction Button
-if st.button("🔍 Predict Risk"):
+# ---------------- PREDICTION ----------------
+if st.button("🔍 Run Diagnosis"):
 
-    # Validation check
-    if gcs_total < 3 or gcs_total > 15:
-        st.error("Invalid GCS Score")
+    input_data = np.array([[age, systolic_bp, gcs_total, seizure, vomiting, afib]])
+
+    prediction = model.predict(input_data)[0]
+    probability = model.predict_proba(input_data)[0][1]
+    risk_percent = probability * 100
+
+    # Risk Level
+    if risk_percent < 30:
+        color = "#28a745"
+        level = "Mild"
+    elif risk_percent < 70:
+        color = "#ffc107"
+        level = "Moderate"
     else:
-        input_data = np.array([[age, systolic_bp, gcs_total, seizure, vomiting, afib]])
+        color = "#dc3545"
+        level = "Severe"
 
-        prediction = model.predict(input_data)[0]
-        probability = model.predict_proba(input_data)[0][1]
-        risk_percent = probability * 100
+    # ---------------- MAIN DASHBOARD ----------------
+    left, right = st.columns([2, 1])
 
-        st.markdown("## 📊 Prediction Result")
+    # LEFT PANEL (RESULT)
+    with left:
+        st.markdown("## 📊 Risk Analysis")
 
-        # Progress bar
         st.progress(int(risk_percent))
 
-        # Risk Color Logic
-        if risk_percent < 30:
-            color = "green"
-            level = "Mild"
-        elif risk_percent < 70:
-            color = "orange"
-            level = "Moderate"
-        else:
-            color = "red"
-            level = "Severe"
-
-        # Result Display
         st.markdown(
             f"""
-            <div style='padding:20px;border-radius:10px;background-color:#f1f3f5'>
-                <h3 style='color:{color}'>Risk Level: {level}</h3>
-                <h4>Probability: {risk_percent:.2f}%</h4>
+            <div style='padding:25px;border-radius:15px;background-color:#f8f9fa'>
+                <h2 style='color:{color}'>Risk Level: {level}</h2>
+                <h3>Probability: {risk_percent:.2f}%</h3>
             </div>
             """,
             unsafe_allow_html=True
         )
 
         if prediction == 1:
-            st.error("🔴 High Hemorrhage Risk Detected")
+            st.error("🔴 High Risk Detected")
         else:
-            st.success("🟢 Low Hemorrhage Risk")
+            st.success("🟢 Low Risk")
 
-        # Recommendations
-        st.markdown("### 🩺 Recommendations")
+    # RIGHT PANEL (DETAILS)
+    with right:
+        st.markdown("## 🧾 Clinical Flags")
+
+        st.write(f"Seizure: {'Yes' if seizure else 'No'}")
+        st.write(f"Vomiting: {'Yes' if vomiting else 'No'}")
+        st.write(f"Atrial Fibrillation: {'Yes' if afib else 'No'}")
+
+        st.markdown("---")
+
+        st.markdown("## 🩺 Recommendation")
 
         if level == "Mild":
-            st.info("Maintain healthy lifestyle and monitor regularly.")
+            st.success("Routine monitoring recommended.")
         elif level == "Moderate":
-            st.warning("Consult a doctor and monitor symptoms closely.")
+            st.warning("Consult neurologist.")
         else:
-            st.error("Seek immediate medical attention!")
+            st.error("Immediate hospitalization required!")
+
+# ---------------- FOOTER ----------------
+st.markdown(
+    """
+    <hr>
+    <center>⚠️ This system is AI-assisted and not a substitute for medical professionals.</center>
+    """,
+    unsafe_allow_html=True
+)
